@@ -12,7 +12,7 @@ data "oci_identity_tenancy" "this" {
 data "oci_identity_compartments" "all" {
   compartment_id            = var.tenancy_ocid
   compartment_id_in_subtree = var.include_compartments_in_subtree
-  lifecycle_state           = var.compartment_state
+  access_level              = "ACCESSIBLE"
 }
 
 locals {
@@ -23,7 +23,7 @@ locals {
         id               = var.tenancy_ocid
         name             = data.oci_identity_tenancy.this.name
         description      = "Tenancy root compartment"
-        lifecycle_state  = "ACTIVE"
+        state  = "ACTIVE"
       }
     ],
     [
@@ -32,9 +32,9 @@ locals {
         id              = c.id
         name            = c.name
         description     = c.description
-        lifecycle_state = c.lifecycle_state
+        state = c.state
       }
-      if c.lifecycle_state == "ACTIVE"
+      if c.state == "ACTIVE"
     ]
   )
 
@@ -99,7 +99,7 @@ data "oci_objectstorage_namespace" "ns" {
 }
 
 # Buckets are compartment-scoped but require namespace_name
-data "oci_objectstorage_buckets" "by_comp" {
+data "oci_objectstorage_bucket_summaries" "by_comp" {
   for_each       = toset(local.compartment_ids)
   compartment_id = each.key
   namespace      = data.oci_objectstorage_namespace.ns.namespace
@@ -135,7 +135,7 @@ locals {
         name            = v.display_name
         cidr_block      = v.cidr_block
         compartment_id  = v.compartment_id
-        state           = v.lifecycle_state
+        state           = v.state
         dns_label       = v.dns_label
         time_created    = v.time_created
       }
@@ -156,7 +156,7 @@ locals {
         dhcp_options_id = s.dhcp_options_id
         security_list_ids = s.security_list_ids
         time_created    = s.time_created
-        state           = s.lifecycle_state
+        state           = s.state
       }
     ]
   ])
@@ -170,7 +170,7 @@ locals {
         name            = i.display_name
         compartment_id  = i.compartment_id
         shape           = i.shape
-        state           = i.lifecycle_state
+        state           = i.state
         time_created    = i.time_created
         availability_domain = i.availability_domain
         region          = var.region
@@ -189,7 +189,7 @@ locals {
         name            = v.display_name
         size_in_gbs     = v.size_in_gbs
         compartment_id  = v.compartment_id
-        state           = v.lifecycle_state
+        state           = v.state
         time_created    = v.time_created
       }
     ]
@@ -203,7 +203,7 @@ locals {
         id              = b.id
         size_in_gbs     = b.size_in_gbs
         compartment_id  = b.compartment_id
-        state           = b.lifecycle_state
+        state           = b.state
         time_created    = b.time_created
         availability_domain = b.availability_domain
       }
@@ -221,24 +221,27 @@ locals {
         shape           = lb.shape_name
         ip_addresses    = lb.ip_addresses
         is_private      = lb.is_private
-        state           = lb.lifecycle_state
+        state           = lb.state
         time_created    = lb.time_created
       }
     ]
   ])
 
   buckets = flatten([
-    for cid, bs in data.oci_objectstorage_buckets.by_comp :
+    for cid, bs in data.oci_objectstorage_bucket_summaries.by_comp :
     [
-      for b in bs.buckets :
+      for b in bs.bucket_summaries:
       {
         name            = b.name
         compartment_id  = b.compartment_id
         namespace       = data.oci_objectstorage_namespace.ns.namespace
         storage_tier    = b.storage_tier
-        public_access   = b.public_access_type
+        public_access   = b.access_type
         kms_key_id      = b.kms_key_id
         time_created    = b.time_created
+        defined_tags    = b.defined_tags
+        freeform_tags   = b.freeform_tags
+
       }
     ]
   ])
@@ -249,7 +252,7 @@ locals {
       id           = u.id
       name         = u.name
       description  = u.description
-      state        = u.lifecycle_state
+      state        = u.state
       time_created = u.time_created
     }
   ]
@@ -260,7 +263,7 @@ locals {
       id           = g.id
       name         = g.name
       description  = g.description
-      state        = g.lifecycle_state
+      state        = g.state
       time_created = g.time_created
     }
   ]
@@ -275,7 +278,7 @@ locals {
       description     = p.description
       time_created    = p.time_created
       version_date    = p.version_date
-      state           = p.lifecycle_state
+      state           = p.state
     }
   ]
 }
